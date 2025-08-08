@@ -1,0 +1,424 @@
+*********************** TMD Format FAQ ***********************
+
+
+-====-
+HEADER
+-====-
+
+A .tmd file has a header starting at the very first byte of the file.
+
+ offset type
+ 
+   0    ID
+   4    Flags
+   8    Num
+  
+ ID - Always 0x00000041
+ Flags - Set to 1 if processed by GsMapModelingData(), else 0
+ Num - Number Objects in tmd
+  
+This structure only appears once and is directly followed by the
+first Object Header.
+
+   ****************************************************   
+
+-===========-
+Object Header
+-===========-
+
+This header describes each object in the tmd file.  All file offsets
+within this object are taken from this point.
+
+ offset type
+
+   0    Vertices Table
+   4    Number Vertices
+   8    Normal list Offset
+  12    Number Normals
+  16    Polygon Primitives Offset
+  20    Number Primitives
+  24    scaling (apparently unused)
+ 
+ The "Vertices Table" points to a table of vectors (see below for
+ detail) with "Number Vertices" elements.  This is the x,y,z coord for
+ each point in the object.
+ 
+ Normals are stored identically to the Vertices but obviously contain
+ normal vectors.
+ 
+ The Polygon Primitives describe each polygon in the scene (3 and 
+ 4 sided) these records have varying sizes.
+
+   ****************************************************   
+ 
+-==================-
+Vertices and Normals
+-==================-
+
+To read the Vertices and Normal Data just seek to the offset specified
+in the Object Header structure.  Remember to add the tmd header size
+to the offsets. 
+ 
+  NormalTab = ObjHead->NormalOffset + sizeof (tmdheader);
+    
+The Vertices and Normal are just vectors.
+ 
+ offset type
+
+   0    x
+   2    y
+   4    z
+   6    filler
+ 
+  filler is just for alignment padding and has no use.
+
+   ****************************************************   
+ 
+-========-
+Primitives
+-========-
+
+This is where the fun starts. :-)
+ 
+This is a table of all the polygons in this object.
+Each polygon has a header, which is followed by a variable
+size data block.
+
+ 
+ ->HEADER<-
+ 
+ offset type
+
+   0    olen 
+   1    ilen
+   2    flag
+   3    mode
+ 
+ olen - output data block length (dwords)
+ ilen - input data block length (dwords)
+
+ The output data block length is fixed according to internal PS-X
+ primitive formats and is the size of the primitive within the order
+ table. The values are listed with each primitive below.
+
+ The input data block length reports how much data is to follow. 
+
+ If your reader does not understand the following data or wishes to
+ ignore it.  It can just skip 'length * 4' bytes.
+ 
+ The data to follow can be determined by the mode and flags fields.
+ 
+ The Mode and Flags fields are both split into bitfields.  
+ 
+
+ ->MODE<-
+ 
+ bits hex  type
+
+  0    1   Brightness
+  1    2   Transparency
+  2    4   Texture
+  3    8   Quad
+  4   10   Gouraud
+  5   20   1
+ 
+ Bit 5 of the mode field is always 1.
+ 
+ bit 0 == 1 No flat shading [No Light]
+ bit 1 == 1 Transparency On
+ bit 2 == 1 Polygon Textured
+ bit 3 == 1 4 sided polygon
+ bit 4 == 1 Polygon is Gouraud shaded (or gradated for lines)
+ bit 5 == 1 Always 1 for polys, 0 for lines
+ 
+
+ ->FLAG<-
+ 
+ bits hex type
+ 0 1 Light Source 
+ 1 2 2 Sided
+ 2 4 Gradation
+ 
+ bit 0 == 1 Do not calculate light sourcing
+ bit 1 == 1 Polygon is double sided
+ bit 2 == 1 Gradated
+
+   ****************************************************   
+ 
+ The structure that follow below are the data blocks for each 
+ polygon mode.
+
+ N.B. mode2 is a copy of mode, and is used as a filler 
+      Flag == 1 is a bit of a guess for "No Light Polygons". Try it and see...
+
+  
+*   Mode == 0x20 && Flag == 0 (Flat Shaded Triangle) ilen == 3 olen == 4
+
+ offset type
+
+   0    red
+   1    green
+   2    blue
+   3    mode2
+   4    index into normal table
+   6    first point
+   8    second point
+  10    third point
+    
+    The rgb fields specify the ambient colour of the poly.
+    
+    Next is the offset in to the normal table for this 
+    polygons Normal Vector.
+      
+    Followed by three indexes into the vertex table for 
+    each point of the poly.
+
+
+*   Mode == 0x20 && Flag == 4 (Gradated Triangle) ilen == 5 olen == 6
+    
+ offset type
+
+   0    red0 
+   1    green0
+   2    blue0
+   3    mode2
+   4    red1 
+   5    green1
+   6    blue1
+   7    pad0
+   8    red2 
+   9    green2
+  10    blue2
+  11    pad1
+  12    index into normal table
+  14    first point
+  16    second point
+  18    third point
+ 
+ This time we have RGB data for each vertex.          
+
+
+*   Mode == 0x24 && Flag == 0 (Textured Triangle) ilen == 5 olen == 7
+    
+ offset type
+
+   0    u0 
+   1    v0
+   2    cba
+   4    u1
+   5    v1 
+   6    tsb
+   8    u2
+   9    v2
+  10    pad 
+  12    index into normal table
+  14    first point
+  16    second point
+  18    third point          
+
+ u and v are the texture page coordinates
+ cba is the clut number (CBA clutY * 64 + clutX / 16)
+ tsb is the Texture Page + Semitransparency Rate (0..3) << 5 + Colour Mode (0..2) << 7
+
+
+*   Mode == 0x30 && Flag == 0 (Gouraud Shaded Triangle) ilen == 4 olen == 6
+    
+ offset type
+
+   0    red
+   1    green
+   2    blue
+   3    mode2
+   4    index into normal table
+   6    first point
+   8    index into normal table
+  10    second point
+  12    index into normal table
+  14    third point
+ 
+ This is similar to the flat shaded polygon primitives except
+ each vertice has an associated normal.
+
+
+*   Mode == 0x30 && Flag == 4 (Gouraud Gradated Triangle) ilen == 6 olen == 6
+    
+ offset type
+
+   0    red0 
+   1    green0
+   2    blue0
+   3    mode2
+   4    red1 
+   5    green1
+   6    blue1
+   7    pad0
+   8    red2 
+   9    green2
+  10    blue2
+  11    pad1
+  12    index into normal table
+  14    first point
+  16    index into normal table
+  18    second point
+  20    index into normal table
+  22    third point
+
+ 
+*   Mode == 0x34 && Flag == 0 (Goraud Textured Triangle) ilen == 6 olen == 9
+    
+ offset type
+
+   0    u0 
+   1    v0
+   2    cba
+   4    u1
+   5    v1 
+   6    tsb
+   8    u2
+   9    v2
+  10    pad 
+  12    index into normal table
+  14    first point
+  16    index into normal table
+  18    second point
+  20    index into normal table
+  22    third point
+
+
+*   Mode == 0x21 && Flag == 1 (Triangle No Light) ilen == 3 olen == 4
+
+ offset type
+
+   0    red
+   1    green
+   2    blue
+   3    mode2
+   4    first point
+   6    second point
+   8    third point
+  10    pad
+
+
+*   Mode == 0x25 && Flag == 1 (Textured Triangle No Light) ilen == 6 olen == 7
+    
+ offset type
+
+   0    u0 
+   1    v0
+   2    cba
+   4    u1
+   5    v1 
+   6    tsb
+   8    u2
+   9    v2
+  10    pad0
+  12    red
+  13    green
+  14    blue
+  15    pad1   
+  16    first point
+  18    second point
+  20    third point          
+  22    pad2   
+
+
+*   Mode == 0x31 && Flag == 1 (Gouraud Shaded Triangle No Light) ilen == 5 olen == 6
+    
+ offset type
+
+   0    red0
+   1    green0
+   2    blue0
+   3    mode2
+   4    red1
+   5    green1
+   6    blue1
+   7    pad0
+   8    red2
+   9    green2
+  10    blue2
+  11    pad1
+  12    first point
+  14    second point
+  16    third point
+  18    pad2
+ 
+
+*   Mode == 0x35 && Flag == 1 (Goraud Textured Triangle No Light) ilen == 8 olen == 9
+    
+ offset type
+
+   0    u0 
+   1    v0
+   2    cba
+   4    u1
+   5    v1 
+   6    tsb
+   8    u2
+   9    v2
+  10    pad0
+  12    red0
+  13    green0
+  14    blue0
+  15    pad1
+  16    red1
+  17    green1
+  18    blue1
+  19    pad2
+  20    red2
+  21    green2
+  22    blue2
+  23    pad3
+  24    first point
+  26    second point
+  28    third point
+  30    pad4
+
+   ****************************************************   
+
+Quadrangle structures are identical other than there are 4 entires
+where Triangle structures had 3 (e.g. points, normals, rgb, uv).
+
+A Padding word is added to the end of the structure where it needs to be
+made up to a multiple of dwords in size. This is siginified below with a (P).
+
+*   Mode == 0x28 && Flag == 0 (Flat Shaded Quad) ilen == 4 olen == 5 (P)      
+*   Mode == 0x28 && Flag == 4 (Gradated Quad) ilen == 7 olen == 8 (P)
+*   Mode == 0x2c && Flag == 0 (Textured Quad) ilen == 7 olen == 9 (P)     
+*   Mode == 0x38 && Flag == 0 (Goraud Shaded Quad) ilen == 5 olen == 8
+*   Mode == 0x38 && Flag == 4 (Goraud Gradated Quad) ilen == 8 olen == 8      
+*   Mode == 0x3c && Flag == 0 (Goraud Textured Quad) ilen == 8 olen == 12
+*   Mode == 0x29 && Flag == 1 (Quad No Light) ilen == 3 olen == 5      
+*   Mode == 0x2d && Flag == 1 (Quad No Light) ilen == 7 olen == 9
+*   Mode == 0x39 && Flag == 1 (Quad No Light) ilen == 6 olen == 8      
+*   Mode == 0x3d && Flag == 1 (Quad No Light) ilen == 10 olen == 12
+     
+   ****************************************************   
+
+*   Mode == 0x40 && Flag == 0 (Straight Line) ilen == 2 olen == 3
+
+ offset type
+
+   0    red
+   1    green
+   2    blue
+   3    mode2
+   4    first point
+   6    second point
+ 
+*   Mode == 0x50 && Flag == 4(?) (Gradated Straight Line) ilen == 3 olen == 4
+
+ offset type
+
+   0    red0
+   1    green0
+   2    blue0
+   3    mode2
+   4    red1
+   5    green1
+   6    blue1
+   7    pad
+   8    first point
+   10    second point
+
+   ****************************************************    

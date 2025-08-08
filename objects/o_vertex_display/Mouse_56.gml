@@ -1,0 +1,1 @@
+m_current_vertex = -1;
