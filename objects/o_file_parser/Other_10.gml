@@ -38,12 +38,12 @@ if ( m_valid_file ) {
     var tmd_data_position = -1;
     
     while ( reading_tmd_header < m_tmd_data_count ) {
-        var vertp = m_tmd_header_start + buffer_read(buffer, buffer_u16);
-        var vertc = buffer_read(buffer, buffer_u16);
-        var normp = m_tmd_header_start + buffer_read(buffer, buffer_u16);
-        var normc = buffer_read(buffer, buffer_u16);
-        var polyp = m_tmd_header_start + buffer_read(buffer, buffer_u16);
-        var polyc = buffer_read(buffer, buffer_u16);
+        var vertp = m_tmd_header_start + 4 + buffer_read(buffer, buffer_u32);
+        var vertc = buffer_read(buffer, buffer_u32);
+        var normp = m_tmd_header_start + 4 + buffer_read(buffer, buffer_u32);
+        var normc = buffer_read(buffer, buffer_u32);
+        var polyp = m_tmd_header_start + 4 + buffer_read(buffer, buffer_u32);
+        var polyc = buffer_read(buffer, buffer_u32);
         
         var tmdheader = {
             vertex_offset : vertp,
@@ -59,6 +59,8 @@ if ( m_valid_file ) {
         min_vertex_start = min(min_vertex_start, vertp);
         
         tmd_data_position = buffer_tell(buffer);
+        
+        reading_tmd_header++;
     }
     
     // Create Vertices
@@ -69,30 +71,76 @@ if ( m_valid_file ) {
         var vertidstart = (tmdheader.vertex_offset - min_vertex_start) / 8;
         
         for ( var j = 0; j < tmdheader.vertex_count; j++ ) {
+            var fPos = buffer_tell(buffer);
             var vx = buffer_read(buffer, buffer_s16);
-        var vy = buffer_read(buffer, buffer_s16);
-        var vz = buffer_read(buffer, buffer_s16);
-        var vq = buffer_read(buffer, buffer_s16); 
+            var vy = buffer_read(buffer, buffer_s16);
+            var vz = buffer_read(buffer, buffer_s16);
+            var vq = buffer_read(buffer, buffer_s16); 
+            
+            o_vertex_display.f_create_vertex(fPos, vertidstart + j, vx, vy, vz, vq);
+            show_debug_message($"VERT {vertidstart + j} : {vx}, {vy}, {vz}, {vq}");
         }
     }
+    
+    
     
     buffer_seek(buffer, buffer_seek_start, tmd_data_position);
     for ( var i = 0; i < m_tmd_data_count; i++ ) {
-        buffer_seek(buffer, buffer_seek_relative, 1);
-        var primitve_length = buffer_read(buffer, buffer_u8);
+        var tmdheader = m_tmd_data[i];
         
-        if ( primitve_length == 6 ) {
-            buffer_seek(buffer, buffer_seek_relative, 2); // Skipping Mode
+        buffer_seek(buffer, buffer_seek_start, tmdheader.polygon_offset);
+        var vertidstart = (tmdheader.vertex_offset - min_vertex_start) / 8;
+        
+        for ( var j = 0; j < tmdheader.polygon_count; j++ ) {
+            var primitve_length = buffer_read(buffer, buffer_u8);
+        
+            if ( primitve_length == 6 ) {
+                buffer_seek(buffer, buffer_seek_relative, 2); // Skipping Mode
+                buffer_seek(buffer, buffer_seek_relative, 12); // Skipping UV Data
             
-            buffer_seek(buffer, buffer_seek_relative, 12); // Skipping UV Data
+                var v1 = buffer_read(buffer, buffer_s16);
+                buffer_seek(buffer, buffer_seek_relative, 2);
+        
+                var v2 = buffer_read(buffer, buffer_s16);
+                buffer_seek(buffer, buffer_seek_relative, 2);
             
+                var v3 = buffer_read(buffer, buffer_s16);
+                buffer_seek(buffer, buffer_seek_relative, 2);
+                
+                o_vertex_display.f_connect_vertices(i, vertidstart, v1, v2, v3);
+                
+                
             
+           }
             
+            if ( primitve_length == 8 ) {
+                buffer_seek(buffer, buffer_seek_relative, 2); // Skipping Mode
+                buffer_seek(buffer, buffer_seek_relative, 16); // Skipping UV Data
             
+                var v1 = buffer_read(buffer, buffer_s16);
+                buffer_seek(buffer, buffer_seek_relative, 2);
+        
+                var v2 = buffer_read(buffer, buffer_s16);
+                buffer_seek(buffer, buffer_seek_relative, 2);
+            
+                var v3 = buffer_read(buffer, buffer_s16);
+                buffer_seek(buffer, buffer_seek_relative, 2);
+                
+                var v4 = buffer_read(buffer, buffer_s16);
+                buffer_seek(buffer, buffer_seek_relative, 2);
+                
+                o_vertex_display.f_connect_vertices(i, vertidstart, v1, v2, v3, v4);
+            
+           }
         }
     }
     
-    var reading_tmd_data = true;
+    o_vertex_display.m_group_current = -1;
+    o_vertex_display.m_group_count = m_tmd_data_count;
+    
+ 
+    
+/*    var reading_tmd_data = true;
     while(reading_tmd_data) {
         var vc = buffer_read(buffer, buffer_s16);
         
@@ -234,9 +282,8 @@ if ( m_valid_file ) {
        }
     }
     
-    o_vertex_display.m_group_current = -1;
-    o_vertex_display.m_group_count = array_length(group_sizes);
-        
+    
+        */
 
 }
         

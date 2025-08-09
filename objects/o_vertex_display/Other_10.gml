@@ -2,6 +2,7 @@
     m_vmax = [ 1, 1, 1 ];
     m_vmin = [ -1, -1, -1];
 
+m_vertex_count = array_length(m_vertices);
 for ( var i = 0; i < m_vertex_count; i++ ) {
     var vertex = m_vertices[i];
     

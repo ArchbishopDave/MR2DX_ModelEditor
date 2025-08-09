@@ -18,6 +18,7 @@ for ( var i = 0; i < o_vertex_display.m_vertex_count; i++ ) {
     var vertex = o_vertex_display.m_vertices[i];
     
     if ( vertex != -1 ) {
+        buffer_seek(buffer, buffer_seek_start, vertex.m_file_position);
         buffer_write(buffer, buffer_s16, vertex.m_x);
         buffer_write(buffer, buffer_s16, vertex.m_y);
         buffer_write(buffer, buffer_s16, vertex.m_z);

@@ -1,5 +1,5 @@
 m_id = 0;
-m_group = -1;
+m_groups = [];
 
 m_x = 0;
 m_y = 0;
@@ -32,7 +32,7 @@ f_update_orientation = function() {
     
     m_connected_vertices_count = array_length(m_connected_vertices);
     
-    visible = ( o_vertex_display.m_group_current == -1 || o_vertex_display.m_group_current == m_group );
+    visible = ( o_vertex_display.m_group_current == -1 || array_contains(m_groups, o_vertex_display.m_group_current) );
         
 }
 
